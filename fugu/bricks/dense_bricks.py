@@ -114,10 +114,10 @@ class dense_layer_2d(Brick):
     Dense Layer
     Michael Krygier
     mkrygie@sandia.gov
-    
+	
     """
 
-    def __init__(self, output_shape, weights=1.0, thresholds=0.9, name=None, layer_name="dense_2d"):
+    def __init__(self, output_shape, weights=1.0, thresholds=0.9, name=None, layer_name="dense_2d", decay=1.0, biases=None):
         super().__init__()
         self.is_built = False
         self.name = name
@@ -126,6 +126,8 @@ class dense_layer_2d(Brick):
         self.thresholds = thresholds
         self.metadata = {'isNeuralNetworkLayer': True, 'layer_name': layer_name, 'output_shape': output_shape}
         self.output_shape = output_shape
+        self.decay = decay
+        self.biases = np.array(biases) if biases is not None else np.zeros(self.output_shape)
 
     def build(self, graph, metadata, control_nodes, input_lists, input_codings):
         """
@@ -187,12 +189,30 @@ class dense_layer_2d(Brick):
 
             if self.weights.shape != (output_size, input_size):
                 raise ValueError(f"Weights shape {self.weights.shape} does not equal the necessary shape {(output_size, input_size)}.")
+
+        # Check for scalar value for biases or consistent biases shape
+        if not hasattr(self.biases, '__len__') and (not isinstance(self.biases, str)):
+            self.biases = self.biases * np.ones(self.output_shape)
+        else:
+            if not type(self.biases) is np.ndarray:
+                self.biases = np.array(self.biases)
+
+            if self.biases.shape != self.output_shape:
+                raise ValueError(f"Bias shape {self.biases.shape} does not equal the output neuron shape {self.output_shape}.")
             
         # output neurons/nodes
         output_lists = [[]]
         for row in np.arange(self.output_shape[0]):
             for col in np.arange(self.output_shape[1]):
-                graph.add_node(f'{self.name}d{row}_{col}', index=(row,col), threshold=self.thresholds[row,col], decay=1.0, p=1.0, potential=0.0)
+                graph.add_node(
+                    f'{self.name}d{row}_{col}',
+                    index=(row, col),
+                    threshold=self.thresholds[row, col],
+                    decay=self.decay,
+                    p=1.0,
+                    potential=0.0,
+                    bias=self.biases[row, col],
+                )
                 output_lists[0].append(f'{self.name}d{row}_{col}')
 
         # Collect Inputs
