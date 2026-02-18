@@ -57,8 +57,8 @@ Phi = np.array([
     [0.3313, 0.4527, 0.8729],
 ], dtype=float)
 
-# Input signal y (3-dimensional)
-y = np.array([0.5, 1.0, 1.5], dtype=float)
+# Input signal y (3-dimensional), normalized for stable comparisons
+y = normalize_columns(np.array([0.5, 1.0, 1.5], dtype=float).reshape(-1, 1)).ravel()
 
 # Sparsity parameter lambda
 lam = 0.1
@@ -90,7 +90,6 @@ def slca_lay_bricks():
 
 
 def test_slca_scaffold():
-    backend = slca()
     # Create a scaffold (container for neural circuits)
     scaffold = Scaffold()
 
@@ -102,32 +101,43 @@ def test_slca_scaffold():
 
     # Construct the actual neural graph
     scaffold.lay_bricks()
-    
-    # assert (scaffold.tag_to_name.get('LCABrick-0') is 'LCABrick')
-    assert scaffold.bricks[0].Phi is Phi
-    assert scaffold.bricks[0].input_signal is y
-    assert scaffold.bricks[0].lam == lam
-    assert scaffold.bricks[0].dt == 1e-3
+
+    brick_info = scaffold.circuit.nodes[0].get('brick')
+    assert np.allclose(brick_info.input_signal, y, atol=1e-6)
+    assert brick_info._lam_bias == lam
+    assert brick_info.dt == 1e-3
 
 
-# def test_slca_compile():
-#     backend = slca()
+def test_slca_compile():
+    backend = slca()
 
-#     compile_args = {
-#         'Phi': Phi,
-#         'y': y,
-#         'lam': lam,
-#         'T_steps': 1000,
-#         't0_steps': 100,
-#         'unit_area': True
-#     }
-#     backend.compile(scaffold=None, compile_args=compile_args)
-#     assert backend.Phi == Phi
-#     assert backend.y_obs == y
-#     assert backend.lam == lam
-#     assert backend.T_steps == 1000 
-#     assert backend.t0_steps == 100 
-#     assert backend.unit_area is True
+    # Create a scaffold (container for neural circuits)
+    scaffold = Scaffold()
+
+    # Add the LCA brick with our problem parameters
+    scaffold.add_brick(
+            LCABrick(Phi=Phi, input_signal=y, dt=1e-3, lam=lam, name='LCABrick'),
+        output=True
+    )
+
+    # Construct the actual neural graph
+    scaffold.lay_bricks()
+
+    compile_args = {
+        'Phi': Phi,
+        'y': y,
+        'lam': lam,
+        'T_steps': 1000,
+        't0_steps': 100,
+        'unit_area': True
+    }
+    backend.compile(scaffold=scaffold, compile_args=compile_args)
+    assert np.allclose(backend.Phi, normalize_columns(Phi), atol=1e-8)
+    assert np.allclose(backend.y_obs, y, atol=1e-8)
+    assert backend.lam == lam
+    assert backend.T_steps == 1000 
+    assert backend.t0_steps == 100 
+    assert backend.unit_area is True
 
 
 def test_slca_run():
