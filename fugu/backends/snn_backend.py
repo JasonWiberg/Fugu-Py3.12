@@ -11,6 +11,7 @@ from collections import deque
 from warnings import warn
 
 import fugu.simulators.SpikingNeuralNetwork as snn
+from fugu.simulators.SpikingNeuralNetwork.neuron import LIFNeuron, GeneralNeuron
 
 from .backend import Backend, PortDataIterator
 from ..utils.export_utils import results_df_from_dict
@@ -45,7 +46,31 @@ class snn_Backend(Backend):
             P       =       props.get('p',             1.0)
             if 'potential'        in props: Vinit   = props['potential']
             if 'leakage_constant' in props: Vretain = props['leakage_constant']
-            n = snn.LIFNeuron(neuron, voltage=Vinit, threshold=Vspike, reset_voltage=Vreset, leakage_constant=Vretain, bias=Vbias, p=P, record=recordAll)
+            
+            # Check for specific neuron type
+            neuron_type = props.get('neuron_type', 'LIFNeuron')
+            
+            if neuron_type == 'GeneralNeuron':
+
+                compartment = props.get('compartment', None)
+                leakage_constant = props.get('leakage_constant', Vretain)
+                spike_thresh_lambda = props.get('spike_thresh_lambda', None)
+                n = GeneralNeuron(
+                    name=neuron,
+                    voltage=Vinit,
+                    threshold=Vspike,
+                    reset_voltage=Vreset,
+                    leakage_constant=leakage_constant,
+                    bias=Vbias,
+                    p=P,
+                    record=recordAll,
+                    compartment=compartment,
+                    spike_thresh_lambda=spike_thresh_lambda,
+                )
+            else:
+                # Default to LIFNeuron
+                n = snn.LIFNeuron(neuron, voltage=Vinit, threshold=Vspike, reset_voltage=Vreset, leakage_constant=Vretain, bias=Vbias, p=P, record=recordAll)
+            
             neuron_dict[neuron] = n
             self.nn.add_neuron(n)
 

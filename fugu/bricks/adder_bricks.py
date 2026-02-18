@@ -91,13 +91,11 @@ class streaming_adder(Brick):
         return (graph, self.dimensionality, [{'complete': complete_node, 'begin': begin_node}], output_lists, output_codings)
     
 class temporal_shift(Brick):
-    
     """
     temporal shift function. 
     Brad Aimone
     jbaimon@sandia.gov
     """
-    
     def __init__(self, name=None, shift_length = 1):
         super().__init__()
         self.is_built = False
@@ -132,6 +130,7 @@ class temporal_shift(Brick):
         
         new_complete_node_name = self.name + '_complete'
         new_begin_node_name = self.name + '_begin'
+        
         
         graph.add_node(new_begin_node_name, index = -2, threshold = 0.0, decay =0.0, p=1.0, potential=0.0)
         graph.add_node(new_complete_node_name,

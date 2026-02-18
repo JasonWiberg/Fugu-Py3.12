@@ -4,16 +4,44 @@
 import abc
 import numbers
 import sys
-
+from typing import Callable, Optional, Union
 import numpy as np
 
-from fugu.utils.types import bool_types, float_types, str_types
+from fugu.utils.types import bool_types, float_types, int_types, str_types
 from fugu.utils.validation import int_to_float, validate_type
 
 if sys.version_info >= (3, 4):
     ABC = abc.ABC
 else:
     ABC = abc.ABCMeta("ABC", (), {"__slots__": ()})
+import sys
+
+# compartment classes (moved to separate module)
+from .compartments import Dendrite, COMPARTMENT_REGISTRY
+
+
+# Lambda registry for custom spike threshold criteria
+SPIKE_THRESH_LAMBDA_REGISTRY = {}
+
+def register_spike_thresh_lambda(name: str, lambda_fn: Callable[[float, float], bool]):
+    """Register a custom spike threshold lambda function.
+    
+    Args:
+        name: Registry key for this lambda
+        lambda_fn: Function taking (v_new, v_prev) and returning bool for spike decision
+    """
+    SPIKE_THRESH_LAMBDA_REGISTRY[name] = lambda_fn
+
+def get_spike_thresh_lambda(name: str) -> Optional[Callable[[float, float], bool]]:
+    """Retrieve a registered spike threshold lambda by name."""
+    return SPIKE_THRESH_LAMBDA_REGISTRY.get(name)
+
+
+# Register Loihi graph search spike criterion: v[t+1] >= 1 AND v[t] < 1
+register_spike_thresh_lambda(
+    'loihi_graph_search',
+    lambda v_new, v_prev: v_new >= 1.0 and v_prev < 1.0
+)
 
 
 class Neuron(ABC):
@@ -63,7 +91,9 @@ class LIFNeuron(Neuron):
         leakage_constant=1.0,
         voltage=0.0,
         bias=0.0,
-        p=1.0,
+        p=1,
+        scaling_factor=0.1,
+        scaling=False,
         record=False,
     ):
         """
@@ -71,20 +101,20 @@ class LIFNeuron(Neuron):
 
         Parameters:
             name (any): String, optional.  String name of a neuron. The default is None.
-            threshold : Double, optional.  Threshold value above while the neuron spikes. The default is 0.0.
-            reset_voltage : Double, optional.  The voltage to which the neuron resets after spiking. The default is 0.0.
-            leakage_constant : Double, optional
-                The rate at which the neuron voltage decays. The leakage with rate
-                m is calculated as m*v. A rate of m=1 indicates no leak. For
-                realistic models, 0<= m <=1. The default is 1.0.
-            voltage : Double, optional.  Internal voltage of the neuron. The default is 0.0.
-            bias : Double, optional. Constant bias voltage value that is added at every timestep. The default is 0.0
-            p (double): optional.  Probability of spiking if voltage exceeds threshold.
-                p=1 indicates a deterministic neuron. The default is 1.0.
-            record (bool): optional.  Indicates if a neuron spike state should be sensed with probes. Default is False.
-
+            threshold (Double) : optional.  Threshold value above while the neuron spikes. The default is 0.0.
+            reset_voltage (Double) : optional.  The voltage to which the neuron resets after spiking. The default is 0.0.
+            leakage_constant (Double) : optional. The rate at which the neuron voltage decays. The leakage with rate
+            m is calculated as m*v. A rate of m=1 indicates no leak. For
+            realistic models, 0<= m <=1. The default is 1.0.
+            voltage (Double) : optional.  Internal voltage of the neuron. The default is 0.0.
+            bias (Double) : optional. Constant bias voltage value that is added at every timestep. The default is 0.0
+            p (Double) : optional.  Probability of spiking if voltage exceeds threshold. p=1 indicates a deterministic neuron. The default is 1.0.
+            scaling_factor (Double) : optional. The factor by which the weights should be scaled down to.  Since we are scaling the
+            weights, the range should lie between  0 < scaling_factor <=1. The default is 0.1.
+            scaling (Bool) : optional. Indicates if the weights of the neuron need to undergo synaptic scaling or not.
+            record (Bool) : optional.  Indicates if a neuron spike state should be sensed with probes. Default is False.
         Returns:
-            none
+            None
         """
 
         threshold = int_to_float(threshold)
@@ -93,6 +123,7 @@ class LIFNeuron(Neuron):
         voltage = int_to_float(voltage)
         bias = int_to_float(bias)
         p = int_to_float(p)
+        scaling_factor = int_to_float(scaling_factor)
 
         validate_type(name, str_types)
         validate_type(threshold, float_types)
@@ -101,6 +132,8 @@ class LIFNeuron(Neuron):
         validate_type(voltage, float_types)
         validate_type(bias, float_types)
         validate_type(p, float_types)
+        validate_type(scaling_factor, float_types)
+        validate_type(scaling, bool_types)
         validate_type(record, bool_types)
 
         if leakage_constant < 0 or leakage_constant > 1:
@@ -108,6 +141,9 @@ class LIFNeuron(Neuron):
 
         if p < 0 or p > 1:
             raise ValueError("Probability p must be in the interval [0, 1].")
+
+        if scaling_factor <= 0 or scaling_factor >= 1:
+            raise ValueError("Scaling factor must be in the interval (0,1]")
 
         super(LIFNeuron, self).__init__()
         self.name = name
@@ -118,22 +154,42 @@ class LIFNeuron(Neuron):
         self.v = voltage
         self.presyn = set()
         self.record = record
+        self.scaling = scaling
         self.prob = p
+        self._S = scaling_factor
 
-    def update_state(self):
+    @staticmethod
+    def scale_weights(weight_arr, scale):
+        """
+        Scales the weights of the synapses by applying synaptic scaling based on the maximum weight value
+        Parameters:
+            weight_arr (np.ndarray): array of weights of presynaptic neurons
+            scale: The factor by which the weights need to be scaled
+        Returns:
+            None
+
+        """
+        weight_arr /= np.sum(weight_arr) * scale
+        return weight_arr
+
+    def update_state(self, spike_thresh_lambda: Optional[Callable[[float], bool]] = None):
         """
         Updates the time evolution of the states for one time step.
         The input signals are integrated and accumulates with the internal voltage.
         If the internal voltage exceeds the threshold, the neuron spikes and resets.
-        Otherwise, the neruon leaks at a fixed rate down to its reset value.
+        Otherwise, the neuron leaks at a fixed rate down to its reset value.
         The neuron spikes with probability p if it exceeds the threshold.
 
         Returns:
             None
         """
-        """Update the states for one time step"""
+        # Update the states for one time step
 
         input_v = 0.0
+        if self.scaling:
+            scaled_weights = self.scale_weights(self.get_presynaptic_weights(), self._S)
+            self.set_presynaptic_weights(scaled_weights)
+
         if self.presyn:
             for s in self.presyn:
                 if len(s._hist) > 0:
@@ -141,7 +197,16 @@ class LIFNeuron(Neuron):
 
         self.v = self.v + input_v + self._b
 
-        if self.v > self._T:
+        # Decide spiking via optional lambda if provided, else default v > T
+        if spike_thresh_lambda is not None:
+            try:
+                spike_condition = bool(spike_thresh_lambda(self.v))
+            except Exception:
+                spike_condition = self.v > self._T
+        else:
+            spike_condition = self.v > self._T
+
+        if spike_condition:
             if np.random.random(1) <= self.prob:
                 self.spike = True
                 self.v = self._R
@@ -182,7 +247,7 @@ class LIFNeuron(Neuron):
 
     def show_presynapses(self):
         """
-        Display the synapses the feed into the neuron.
+        Display the synapses that feed into the neuron.
 
         Returns:
             none
@@ -194,6 +259,92 @@ class LIFNeuron(Neuron):
             print("{0} receives input via synapse: {1}".format(self.__repr__(), self.presyn))
         else:
             print("{0} receives input via synapses: {1}".format(self.__repr__(), self.presyn))
+
+    def get_presynapses(self):
+        """
+        Returns the presynaptic neurons that feed into the neuron.
+
+        Returns:
+            set: set of presynaptic neurons
+        """
+
+        return self.presyn
+
+    def get_presynaptic_weights(self):
+        """
+        Returns the weights of the presynaptic neurons that feed into the neuron.
+
+        Returns:
+            list: list of weights of presynaptic neurons
+        """
+
+        return np.array([s.weight for s in self.presyn])
+
+    def set_presynaptic_weights(self, weight_arr):
+        """
+        Set the weights of the presynaptic neurons that feed into the neuron.
+
+        Parameters:
+            weight_arr (np.ndarray): array of weights of presynaptic neurons
+        Returns:
+            None
+        """
+
+        for i, s in enumerate(self.presyn):
+            s.weight = weight_arr[i]
+
+    @property
+    def scaling_factor(self):
+        return self._S
+
+    @scaling_factor.setter
+    def scaling_factor(self, new_factor):
+        new_factor = int_to_float(new_factor)
+        validate_type(new_factor, float_types)
+        self._S = new_factor
+
+    def get_presynapses(self):
+        """
+        Returns the presynaptic neurons that feed into the neuron.
+
+        Returns:
+            set: set of presynaptic neurons
+        """
+
+        return self.presyn
+
+    def get_presynaptic_weights(self):
+        """
+        Returns the weights of the presynaptic neurons that feed into the neuron.
+
+        Returns:
+            list: list of weights of presynaptic neurons
+        """
+
+        return np.array([s.weight for s in self.presyn])
+
+    def set_presynaptic_weights(self, weight_arr):
+        """
+        Set the weights of the presynaptic neurons that feed into the neuron.
+
+        Parameters:
+            weight_arr (np.ndarray): array of weights of presynaptic neurons
+        Returns:
+            None
+        """
+
+        for i, s in enumerate(self.presyn):
+            s.weight = weight_arr[i]
+
+    @property
+    def scaling_factor(self):
+        return self._S
+
+    @scaling_factor.setter
+    def scaling_factor(self, new_factor):
+        new_factor = int_to_float(new_factor)
+        validate_type(new_factor, float_types)
+        self._S = new_factor
 
     @property
     def threshold(self):
@@ -239,21 +390,30 @@ class LIFNeuron(Neuron):
 class InputNeuron(Neuron):
     """
     Input Neuron. Inherits from class Neuron.
-    Input Neurons can read inputs and convert them to spike streams
+    Input Neurons can read streaming inputs
     """
 
-    def __init__(self, name=None, threshold=0.1, voltage=0.0, record=False):
+    def __init__(
+        self,
+        name=None,
+        threshold=0.1,
+        voltage=0.0,
+        frequency=100,
+        bins=100,
+        record=False,
+    ):
         """
-        Constructor for Input Neuron.
+        Constructor for the new input neuron class
 
         Parameters:
-            name : String, optional. Input neuron name. The default is None.
-            threshold (double): optional. Threashold value above which the neuron spikes. The default is 0.1.
-            voltage (double): optional. Membrane voltage. The default is 0.0.
-            record (bool): optional. Indicates if a neuron spike state should be sensed with probes. The default is False.
-
+            name: String, optional. Input neuron name. The default is None.
+            threshold: double, optional. Threshold value above which the neuron spikes. The default is 0.1.
+            voltage: double, optional. Membrane voltage. The default is 0.0.
+            frequency: double, optional. Frequency of the Poisson spikes from the input data. The default is 100.
+            bins: double, optional. Number of bins for the Poisson spikes. The default is 100.
+            record: bool, optional. Indicates if a neuron spike state should be sensed with probes. The default is False.
         Returns:
-            none
+            None
         """
 
         threshold = int_to_float(threshold)
@@ -262,6 +422,8 @@ class InputNeuron(Neuron):
         validate_type(name, str_types)
         validate_type(threshold, float_types)
         validate_type(voltage, float_types)
+        validate_type(frequency, int_types)
+        validate_type(bins, int_types)
         validate_type(record, bool_types)
 
         super(InputNeuron, self).__init__()
@@ -270,13 +432,15 @@ class InputNeuron(Neuron):
         self.v = voltage
         self._it = None
         self.record = record
+        self.fr = frequency
+        self.bins = bins
 
     def connect_to_input(self, in_stream):
         """
         Enables a neuron to read in an input stream of data.
 
         Parameters:
-            in_stream (any): interable data streams of ints or floats. input data (any interable stream such as lists, arrays, etc.).
+            in_stream: interable data streams of ints or floats. input data (any interable stream such as lists, arrays, etc.).
         Raises:
             TypeError: if in_stream is not iterable.
         Returns:
@@ -287,6 +451,34 @@ class InputNeuron(Neuron):
             raise TypeError("{in_stream} must be iterable".format(**locals()))
         else:
             self._it = iter(in_stream)
+
+    def show_iterable(self):
+        """
+        Display the iterable input data stream.
+
+        Returns:
+            None
+        """
+        from itertools import tee
+
+        iter_copy = tee(self._it)
+        iter_list = list(iter_copy)
+        print(f"Input Neuron {self.name} has input stream {iter_list}")
+        print(f"The input stream has {np.count_nonzero(np.array(iter_list))} spikes")
+
+    def show_iterable(self):
+        """
+        Display the iterable input data stream.
+
+        Returns:
+            None
+        """
+        from itertools import tee
+
+        iter_copy = tee(self._it)
+        iter_list = list(iter_copy)
+        print(f"Input Neuron {self.name} has input stream {iter_list}")
+        print(f"The input stream has {np.count_nonzero(np.array(iter_list))} spikes")
 
     def update_state(self):
         """
@@ -301,12 +493,11 @@ class InputNeuron(Neuron):
 
         try:
             n = next(self._it)
+            # print (n, "THe iterable value", sum(1 for e in self._it))
             if not isinstance(n, numbers.Real):
                 raise TypeError("Inputs must be int or float")
-
             self.v = n
-
-            if self.v > self._T:
+            if self.v > 0:
                 self.spike = True
                 self.v = 0
             else:
@@ -315,6 +506,8 @@ class InputNeuron(Neuron):
         except StopIteration:
             self.spike = False
             self.v = 0
+        # Need to check if there is any way to store only the timestep instead of the entire spike history
+        self.spike_hist.append(self.spike)
 
     @property
     def threshold(self):
@@ -361,9 +554,151 @@ if __name__ == "__main__":
         n0.connect_to_input(2)
     except:
         print("Raises TypeError because input is not iterable")
-    ip = [5, 4, 0, 1]
+    ip = np.array([5, 4, 0, 1])
     n0.connect_to_input(ip)
     print(f"Input Neuron Spikes for 7 time steps with input stream {ip}:")
     for i, _ in enumerate(range(7)):
         n0.update_state()
         print(f"Time {i}: {n0.spike}")
+
+
+class GeneralNeuron(LIFNeuron):
+    """
+    General-purpose neuron that exposes the same public interface as ``LIFNeuron``
+    and optionally attaches a dendritic compartment to handle recurrent inhibitory
+    dynamics. Spiking and leak are performed by invoking ``LIFNeuron.update_state``
+    so the soma dynamics remain unchanged; the compartment only computes an
+    inhibition current that modulates the effective bias.
+    """
+
+    def __init__(
+        self,
+        name=None,
+        threshold=0.0,
+        reset_voltage=0.0,
+        leakage_constant=1.0,
+        voltage=0.0,
+        bias=0.0,
+        p=1.0,
+        record=False,
+        compartment=None,
+        spike_thresh_lambda: Optional[Union[Callable, str]] = None,
+    ):
+        """
+        Mirrors ``LIFNeuron`` signature and adds an optional ``compartment`` field.
+
+        Args:
+            compartment (dict | None):
+                - None: disable and fall back to plain LIF behaviour
+                - dict: {'name': <CompartmentClassName>, <param1>: val1, ...}
+                  'name' is optional and defaults to 'RecurrentInhibition'.
+                  Remaining keys are passed as kwargs to the compartment ctor and
+                  must match parameter names exactly.
+            spike_thresh_lambda (Callable | str | None):
+                - None: use default threshold crossing (v > T)
+                - str: lookup key in SPIKE_THRESH_LAMBDA_REGISTRY
+                - Callable: custom lambda(v_new, v_prev) -> bool
+        """
+        super(GeneralNeuron, self).__init__(
+            name=name,
+            threshold=threshold,
+            reset_voltage=reset_voltage,
+            leakage_constant=leakage_constant,
+            voltage=voltage,
+            bias=bias,
+            p=p,
+            record=record,
+        )
+
+        # Optional dendritic compartment wiring (dict-based)
+        self.compartment = None
+        if compartment is None:
+            self.compartment = None
+        elif isinstance(compartment, dict):
+            comp_name = compartment.get("name", "RecurrentInhibition")
+            params = {k: v for k, v in compartment.items() if k != "name"}
+            cls = COMPARTMENT_REGISTRY.get(comp_name)
+            print(cls)
+            if cls is None:
+                raise ValueError(
+                    f"Unknown compartment name '{comp_name}'. Available: {list(COMPARTMENT_REGISTRY.keys())}"
+                )
+            try:
+                instance = cls(**params)
+            except TypeError as e:
+                raise TypeError(
+                    f"Failed to construct compartment '{comp_name}' with params {params}: {e}"
+                )
+            if not isinstance(instance, Dendrite):
+                raise TypeError(f"Constructed compartment is not a Dendrite: {type(instance)}")
+            self.compartment = instance
+        else:
+            raise TypeError("compartment must be None or dict")
+
+        
+        # Store spike threshold lambda - resolve string keys to functions
+        if isinstance(spike_thresh_lambda, str):
+            resolved = get_spike_thresh_lambda(spike_thresh_lambda)
+            if resolved is None:
+                raise ValueError(f"Unknown spike_thresh_lambda key: '{spike_thresh_lambda}'")
+            self.spike_thresh_lambda = resolved
+        else:
+            self.spike_thresh_lambda = spike_thresh_lambda
+        
+        # Track previous voltage for lambdas that need it
+        # Initialize to 0.0 to allow threshold crossing on first step
+        self.v_prev = 0.0
+
+    def _soma_spike_decision(self, voltage: float) -> bool:
+        """Decide whether the soma should spike at current voltage.
+
+        Uses the user-supplied ``spike_thresh_lambda`` if provided, otherwise
+        defaults to ``voltage > self._T``. Lambda receives (v_new, v_prev).
+        """
+        if self.spike_thresh_lambda is None:
+            return voltage > self._T
+        try:
+            return bool(self.spike_thresh_lambda(voltage, self.v_prev))
+        except Exception:
+            return voltage > self._T
+
+    def update_state(self):
+        """
+        If no compartment is attached, behave exactly like ``LIFNeuron``.
+        If a compartment is attached, delegate to the compartment's ``update``
+        method with a callback to perform the LIF update under temporary
+        overrides. This makes interaction fully customizable by the compartment.
+        """
+        if self.compartment is None:
+            # Wrap the 2-arg spike_thresh_lambda in a 1-arg adapter for LIFNeuron.update_state
+            if self.spike_thresh_lambda is not None:
+                adapter = lambda v_new: self._soma_spike_decision(v_new)
+                super(GeneralNeuron, self).update_state(spike_thresh_lambda=adapter)
+            else:
+                super(GeneralNeuron, self).update_state(spike_thresh_lambda=None)
+            
+            # Update v_prev AFTER spike decision so it holds post-reset voltage
+            # This prevents re-spiking: if neuron spiked and reset to R > threshold,
+            # then v_prev > threshold on next step, so threshold-crossing lambda returns False
+            self.v_prev = self.v
+            return
+
+        # Define a helper that runs one LIF step under temporary overrides
+        def lif_update(bias=None, ignore_presyn=False):
+            old_bias = self._b
+            old_presyn = self.presyn
+            try:
+                if bias is not None:
+                    self._b = float(bias)
+                if ignore_presyn:
+                    self.presyn = set()
+                # Always delegate to base LIF update, passing any custom lambda
+                super(GeneralNeuron, self).update_state(
+                    spike_thresh_lambda=self.spike_thresh_lambda
+                )
+            finally:
+                self._b = old_bias
+                self.presyn = old_presyn
+
+        # Delegate to the compartment for custom interaction
+        self.compartment.update(self, lif_update)

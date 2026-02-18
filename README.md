@@ -1,14 +1,23 @@
+[![DOI](https://zenodo.org/badge/465425461.svg)](https://doi.org/10.5281/zenodo.18418270)
+
 # Fugu
 A python library for computational neural graphs.
+
+_Note: the `master` branch has been renamed to `main`. We've kept an old version in case it would break any local branches, but on your next git push type the following command to have your origin branch renamed on your local machine:_
+```bash
+git push origin HEAD
+```
 
 # Install
 
 ## Dependencies
-A full list of dependencies is listed in requirements.txt.  The high level dependencies are:
+A full list of dependencies is listed in setup.py. The high level dependencies are:
 
-- Numpy
-- NetworkX
-- Pandas
+- Python>=3.9, <3.12
+- numpy>=2
+- pandas~=2.2.3
+- networkx=3.2
+- scipy
 
 ### A Note on Running Examples
 
@@ -20,17 +29,22 @@ Some of the examples additionally require Jupyter and matplotlib.
 git clone https://github.com/sandialabs/Fugu.git
 cd Fugu
 pip install --upgrade pip
-pip install -e .[examples]
+pip install -e .[whetstone,dev,examples]
 ```
 
 ## Using Conda
-Let's install the requirements for Fugu.
 ```bash
-git clone https://github.com/sandialabs/Fugu.git
-cd Fugu
-conda env create -f fugu_conda_environment.yml
+conda create --name fugu python=3.11
 conda activate fugu
-conda develop $PWD
+python -m pip install --upgrade pip
+python -m pip install -e .[whetstone,dev,examples]
+```
+
+## Verify Installation
+Use pytest to verify installation
+
+```bash
+pytest
 ```
 
 ## [OPTIONAL] STACS Backend
@@ -81,7 +95,7 @@ make -j2
 Documentation is currently spread across several files and directories.  We are working on including docstrings on all the classes and methods.
 
 For now, you can check:
-- https://sandialabs.github.io/Fugu/
+- http://sandialabs.github.io/Fugu/
 - This `README.md`
 - The `examples` folder
 
@@ -130,7 +144,7 @@ or
 
 Next, we install the pre-commit hooks with
 `pre-commit install --install-hooks`
-*Note:* `.pre-commit-config.yaml` must be present in the top level of Fugu for the pre-commit installation. For the pre-commit installs to work properly for me, I had to disconnect from the Sandia VPN. Lastly, these instructions have been tested using a conda environment.
+*Note:* `.pre-commit-config.yaml` must be present in the top level of Fugu for the pre-commit installation. Lastly, these instructions have been tested using a conda environment.
 
 Now the pre-commit hooks will be installed. The next time you commit a file to the repository, `isort` and `black` will check that the file conforms to the new code standards. If the file passes the checks then you will be prompted to enter a commit message. Otherwise, the pre-commit will display if one or both commands failed. To fix the problem run one or both of these commands on the culprit file:
 
@@ -180,7 +194,7 @@ Click [here](tests/README.md) for more information and instructions on Fugu's te
 ## Branches
 
 We suggest the following convention for naming branches: `username/##-branch-name`, where:
-- `username`: your GitLab username
+- `username`: your GitHub username
 - `##`: issue number (can be omitted if branch is not tied to an issue)
 - `branch-name`: a short descrition of the work
 
@@ -231,3 +245,50 @@ an input (if calling `Brick.build`) or an output (if returning from `Brick.build
 | ------ | ------ | ------ |
 | 'complete' | All Inputs/Outputs | A neuron that fires when a brick is done processing. |
 | 'begin' | Temporally-coded Inputs/Outputs | A neuron that fires when a brick begins providing output. |
+
+# Citation
+
+If you use this software, please cite both the original article and this software repository.
+
+Software Repository:
+
+```bibtex
+@software{FuguSoftware2026,
+author = {Krygier, Michael C. and Severa, William and Ho, Yang and Rothganger, Fred and Wang, Felix and Musuvathy, Srideep and Aimone, James B.},
+doi = {10.5281/zenodo.18418271},
+license = {BSD-3-clause},
+month = jan,
+title = {{Fugu Software}},
+url = {https://github.com/sandialabs/Fugu},
+version = {1.4.2},
+year = {2026}
+}
+```
+
+APA Style
+
+> Krygier, M. C., Severa, W., Ho, Y., Rothganger, F., Wang, F., Musuvathy, S., & Aimone, J. B. (2026). Fugu Software (Version 1.4.2) [Computer software]. https://doi.org/10.5281/zenodo.18418271
+
+Original Paper:
+
+```bibtex
+@inproceedings{Aimone2019,
+author = {Aimone, James B. and Severa, William and Vineyard, Craig M.},
+title = {Composing neural algorithms with Fugu},
+year = {2019},
+isbn = {9781450376808},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3354265.3354268},
+doi = {10.1145/3354265.3354268},
+booktitle = {Proceedings of the International Conference on Neuromorphic Systems},
+articleno = {3},
+numpages = {8},
+location = {Knoxville, TN, USA},
+series = {ICONS '19}
+}
+```
+
+APA Style
+
+> James B. Aimone, William Severa, and Craig M. Vineyard. 2019. Composing neural algorithms with Fugu. In Proceedings of the International Conference on Neuromorphic Systems (ICONS '19). Association for Computing Machinery, New York, NY, USA, Article 3, 1–8. https://doi.org/10.1145/3354265.3354268

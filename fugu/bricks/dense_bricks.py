@@ -14,13 +14,15 @@ class dense_layer_1d(Brick):
     
     """
 
-    def __init__(self, output_shape, weights, thresholds, name=None, layer_name="dense_1d"):
+    def __init__(self, output_shape, weights, thresholds, decay=1.0, biases=None, name=None, layer_name="dense_1d"):
         super().__init__()
         self.is_built = False
         self.name = name
         self.supported_codings = ["binary-L"]
+        self.decay = decay
         self.weights = np.array(weights)
         self.thresholds = np.array(thresholds)
+        self.biases = np.array(biases) if biases is not None else np.zeros(np.prod(output_shape))
         self.metadata = {'isNeuralNetworkLayer': True, 'layer_name': layer_name, 'output_shape': output_shape}
         self.output_shape = output_shape
 
@@ -64,10 +66,12 @@ class dense_layer_1d(Brick):
         graph.add_edge(control_nodes[0]["begin"], begin_node, weight=0.0, delay=1)
 
         num_input_neurons = len(input_lists[0])
-        num_output_neurons = num_input_neurons
-        
+        num_output_neurons = np.prod(self.output_shape)
         output_size = np.prod(self.output_shape)
         input_size = np.prod(self.input_shape)
+        # Add a constant bias node
+        # bias_node = self.name + "_bias"
+        # graph.add_node(bias_node, index=-2, threshold=0.0, decay=0.0, p=1.0, potential=1.0)  # always outputs 1
 
         # Check for scalar value for thresholds or consistent thresholds shape
         if not hasattr(self.thresholds, '__len__') and (not isinstance(self.thresholds, str)):
@@ -86,17 +90,19 @@ class dense_layer_1d(Brick):
         # output neurons/nodes
         output_lists = [[]]
         for id in np.arange(num_output_neurons):
-            graph.add_node(f'{self.name}d{id}', index=id, threshold=self.thresholds[id], decay=1.0, p=1.0, potential=0.0)
+            graph.add_node(f'{self.name}d{id}', index=id, threshold=self.thresholds[id], decay=self.decay, p=1.0, potential=0.0, bias=self.biases[id])
             output_lists[0].append(f'{self.name}d{id}')
 
         # Collect Inputs
         prev_layer = input_lists[0]
-
         # Construct edges connecting input and output nodes
         for i in np.arange(num_output_neurons):  # loop over output neurons
             for k in np.arange(num_input_neurons): # loop over input neurons
                 graph.add_edge(prev_layer[k], f'{self.name}d{i}', weight=self.weights[i,k], delay=1)
                 logging.debug(f" p{k} --> d{i}")
+            # Add bias edge from bias_node
+            # graph.add_edge(bias_node, f'{self.name}d{i}', weight=self.biases[i], delay=1)
+            # logging.debug(f" bias --> d{i} weight: {self.biases[i]}")
 
         self.is_built = True
         return (graph, self.metadata, [{"complete": complete_node, "begin": begin_node}], output_lists, output_codings,)
@@ -108,10 +114,10 @@ class dense_layer_2d(Brick):
     Dense Layer
     Michael Krygier
     mkrygie@sandia.gov
-    
+	
     """
 
-    def __init__(self, output_shape, weights=1.0, thresholds=0.9, name=None, layer_name="dense_2d"):
+    def __init__(self, output_shape, weights=1.0, thresholds=0.9, name=None, layer_name="dense_2d", decay=1.0, biases=None):
         super().__init__()
         self.is_built = False
         self.name = name
@@ -120,6 +126,8 @@ class dense_layer_2d(Brick):
         self.thresholds = thresholds
         self.metadata = {'isNeuralNetworkLayer': True, 'layer_name': layer_name, 'output_shape': output_shape}
         self.output_shape = output_shape
+        self.decay = decay
+        self.biases = np.array(biases) if biases is not None else np.zeros(self.output_shape)
 
     def build(self, graph, metadata, control_nodes, input_lists, input_codings):
         """
@@ -181,12 +189,30 @@ class dense_layer_2d(Brick):
 
             if self.weights.shape != (output_size, input_size):
                 raise ValueError(f"Weights shape {self.weights.shape} does not equal the necessary shape {(output_size, input_size)}.")
+
+        # Check for scalar value for biases or consistent biases shape
+        if not hasattr(self.biases, '__len__') and (not isinstance(self.biases, str)):
+            self.biases = self.biases * np.ones(self.output_shape)
+        else:
+            if not type(self.biases) is np.ndarray:
+                self.biases = np.array(self.biases)
+
+            if self.biases.shape != self.output_shape:
+                raise ValueError(f"Bias shape {self.biases.shape} does not equal the output neuron shape {self.output_shape}.")
             
         # output neurons/nodes
         output_lists = [[]]
         for row in np.arange(self.output_shape[0]):
             for col in np.arange(self.output_shape[1]):
-                graph.add_node(f'{self.name}d{row}_{col}', index=(row,col), threshold=self.thresholds[row,col], decay=1.0, p=1.0, potential=0.0)
+                graph.add_node(
+                    f'{self.name}d{row}_{col}',
+                    index=(row, col),
+                    threshold=self.thresholds[row, col],
+                    decay=self.decay,
+                    p=1.0,
+                    potential=0.0,
+                    bias=self.biases[row, col],
+                )
                 output_lists[0].append(f'{self.name}d{row}_{col}')
 
         # Collect Inputs

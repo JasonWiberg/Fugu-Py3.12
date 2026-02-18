@@ -187,7 +187,9 @@ class Vector_Input(InputBrick):
             for spike in range(num_spikes):
                 idx_to_build = deque()
                 for dimension in range(len(local_idxs)):
-                    idx_to_build.append(local_idxs[dimension][spike])
+                    # issue is the type 
+                    # idx_to_build.append(int(local_idxs[dimension][spike]))
+                    idx_to_build.append(int(str(local_idxs[dimension][spike])))
                 global_idxs.append(tuple(idx_to_build))
             spiking_neurons = [
                 self.generate_neuron_name(str(idx)) for idx in global_idxs
@@ -200,7 +202,7 @@ class Vector_Input(InputBrick):
 
     def set_properties(self, properties={}):
         new_vector = np.array(properties['spike_vector'])
-        if 'time_dimension' not in properties or properties['time_dimension']:
+        if 'time_dimension' not in properties or not properties['time_dimension']:
             new_vector = np.expand_dims(new_vector, len(new_vector.shape))
         if new_vector.shape != self.vector.shape:
             raise ValueError(
@@ -213,6 +215,28 @@ class Vector_Input(InputBrick):
             self.vector = new_vector
             self.current_time = 0
         return None
+
+    # def set_properties(self, properties={}):
+    #     new_vector = np.array(properties['spike_vector'])
+
+    #     # Normalize to what this brick expects, based on how it was created/built
+    #     if self.time_dimension:
+    #         # Expect time on the last axis already; strip a stray singleton if provided
+    #         if new_vector.ndim == self.vector.ndim + 1 and new_vector.shape[-1] == 1:
+    #             new_vector = np.squeeze(new_vector, -1)
+    #     else:
+    #         # Expect no explicit time axis from the user; ensure a trailing time axis of length 1
+    #         if new_vector.ndim == self.vector.ndim - 1:
+    #             new_vector = np.expand_dims(new_vector, -1)
+
+    #     if new_vector.shape != self.vector.shape:
+    #         raise ValueError(
+    #             "Dimensions of new spike vector ({}) does not match expected ({})"
+    #             .format(new_vector.shape, self.vector.shape)
+    #         )
+    #     self.vector = new_vector
+    #     self.current_time = 0
+    #     return None
 
     def get_input_value(self, t=None):
         warn(
@@ -233,33 +257,12 @@ class Vector_Input(InputBrick):
     def output_ports(cls) -> dict[str, PortSpec]:
         port = PortSpec(name='output')
         port.channels['data']     = ChannelSpec(name='data')
-        port.channels['begin']    = ChannelSpec(name='begin')
-        port.channels['complete'] = ChannelSpec(name='complete')
+        port.channels['begin']    = ChannelSpec(name='begin',    shape=(1,))
+        port.channels['complete'] = ChannelSpec(name='complete', shape=(1,))
         return {port.name: port}
 
     def build2(self, graph, inputs: dict[str, PortData] = {}):
-        """
-        Build spike input brick.
-
-        Args:
-            graph: networkx graph to define connections of the computational graph
-            metadata: dictionary to define the shapes and parameters of the brick
-            control_nodes: list of dictionary of auxillary nodes.
-                Expected keys:
-                    'complete' - A list of neurons that fire when the brick is done
-            input_lists: list of nodes that will contain input
-            input_coding: list of input coding formats
-
-        Returns:
-            graph: graph of a computational elements and connections
-            output_shape, output_coding, layer, D: dictionary of output parameters (shape, coding, layers, depth, etc)
-            complete_node, begin_node: list of dictionary of control nodes ('complete')
-            output_lists (list): list of output
-            output_codings (list): list of coding formats of output
-
-        """
-
-        if not self.time_dimension:
+        if not self.time_dimension:  # Add a pseudo time dimension in last position, to make access uniform between modes. TODO: how does this affect set_properties()?
             self.vector = np.expand_dims(self.vector, len(self.vector.shape))
 
         #print(f"Current vector: {self.vector}")
@@ -274,7 +277,6 @@ class Vector_Input(InputBrick):
         complete_node = self.generate_neuron_name("complete")
         output.channels['begin']   .neurons = [begin_node]
         output.channels['complete'].neurons = [complete_node]
-        vector_size = len(self.vector) * len(self.vector.shape)
         graph.add_node(begin_node,
                        index=-1,
                        threshold=0.0,
