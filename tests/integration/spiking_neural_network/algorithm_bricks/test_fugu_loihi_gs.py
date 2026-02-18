@@ -12,7 +12,7 @@ from typing import Dict, List, Tuple
 from fugu import Scaffold
 from fugu.bricks import LoihiGSBrick
 from fugu.backends import gsearch_Backend
-from tests.unit.bricks.loihi_graph_search import LoihiGraphSearch, preprocess_fanout_constraint
+from tests.integration.spiking_neural_network.algorithm_bricks.loihi_graph_search import LoihiGraphSearch, preprocess_fanout_constraint
 import networkx as nx
 import pytest
 
