@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test suite for Fugu LoihiGSBrick implementation.
+
+Integration test that takes a general neuron with no compartment with a custom threshold via the correctness of LoihiGraphSearch
 """
 
 import unittest
