@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
-
-import torch.nn as nn
+try:
+	import torch.nn as nn
+except ImportError:
+	nn = None
 
 try:  # snnTorch is an optional dependency
 	import snntorch as snn
