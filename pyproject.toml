@@ -10,3 +10,15 @@ line-length = "180"
 
 [tool.pylint.format]
 max-line-length = "180"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--disable-warnings"]
+markers = [
+    "keras: marks keras fugu bricks",
+    "keras_dense: marks keras fugu dense brick tests",
+    "keras_pooling: marks keras fugu pooling brick tests",
+    "keras_convolution: marks keras fugu convolution brick tests",
+    "keras_convolution2: marks keras fugu (not 4d input) convolution brick tests",
+    "whetstone: marks whetstone tests"
+]

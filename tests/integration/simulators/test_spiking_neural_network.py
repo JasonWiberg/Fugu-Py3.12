@@ -3,11 +3,11 @@ import pytest
 
 from fugu.simulators.SpikingNeuralNetwork.neuralnetwork import NeuralNetwork
 from fugu.simulators.SpikingNeuralNetwork.neuron import InputNeuron, LIFNeuron
-from fugu.simulators.SpikingNeuralNetwork.synapse import LearningSynapse
+from fugu.simulators.SpikingNeuralNetwork.synapse import LearningSynapse, Synapse
 
 
-@pytest.fixture
-def a_neural_network():
+@pytest.fixture(params=[Synapse, LearningSynapse], ids=["Synapse", "LearningSynapse"])
+def a_neural_network(request):
     def _inner(record):
         nn = NeuralNetwork()
         in_neuron_a = LIFNeuron("a")
@@ -17,18 +17,19 @@ def a_neural_network():
         layer_neuron_3 = LIFNeuron("layer-1-3", record=record)
         out_neuron = LIFNeuron("out", record=record)
 
-        synapse_a_1 = LearningSynapse(in_neuron_a, layer_neuron_1)
-        synapse_a_2 = LearningSynapse(in_neuron_a, layer_neuron_2)
-        synapse_a_3 = LearningSynapse(in_neuron_a, layer_neuron_3)
-        synapse_b_1 = LearningSynapse(in_neuron_b, layer_neuron_1)
-        synapse_b_2 = LearningSynapse(in_neuron_b, layer_neuron_2)
-        synapse_b_3 = LearningSynapse(in_neuron_b, layer_neuron_3)
-        synapse_1_o = LearningSynapse(layer_neuron_1, out_neuron)
-        synapse_2_o = LearningSynapse(layer_neuron_2, out_neuron)
-        synapse_3_o = LearningSynapse(layer_neuron_3, out_neuron)
-        synapse_2_1 = LearningSynapse(layer_neuron_2, layer_neuron_1)
-        synapse_2_2 = LearningSynapse(layer_neuron_2, layer_neuron_2)
-        synapse_2_3 = LearningSynapse(layer_neuron_2, layer_neuron_3)
+        MySynapse = request.param
+        synapse_a_1 = MySynapse(in_neuron_a, layer_neuron_1)
+        synapse_a_2 = MySynapse(in_neuron_a, layer_neuron_2)
+        synapse_a_3 = MySynapse(in_neuron_a, layer_neuron_3)
+        synapse_b_1 = MySynapse(in_neuron_b, layer_neuron_1)
+        synapse_b_2 = MySynapse(in_neuron_b, layer_neuron_2)
+        synapse_b_3 = MySynapse(in_neuron_b, layer_neuron_3)
+        synapse_1_o = MySynapse(layer_neuron_1, out_neuron)
+        synapse_2_o = MySynapse(layer_neuron_2, out_neuron)
+        synapse_3_o = MySynapse(layer_neuron_3, out_neuron)
+        synapse_2_1 = MySynapse(layer_neuron_2, layer_neuron_1)
+        synapse_2_2 = MySynapse(layer_neuron_2, layer_neuron_2)
+        synapse_2_3 = MySynapse(layer_neuron_2, layer_neuron_3)
 
         nn.add_multiple_neurons(
             [

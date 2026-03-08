@@ -303,49 +303,6 @@ class LIFNeuron(Neuron):
         validate_type(new_factor, float_types)
         self._S = new_factor
 
-    def get_presynapses(self):
-        """
-        Returns the presynaptic neurons that feed into the neuron.
-
-        Returns:
-            set: set of presynaptic neurons
-        """
-
-        return self.presyn
-
-    def get_presynaptic_weights(self):
-        """
-        Returns the weights of the presynaptic neurons that feed into the neuron.
-
-        Returns:
-            list: list of weights of presynaptic neurons
-        """
-
-        return np.array([s.weight for s in self.presyn])
-
-    def set_presynaptic_weights(self, weight_arr):
-        """
-        Set the weights of the presynaptic neurons that feed into the neuron.
-
-        Parameters:
-            weight_arr (np.ndarray): array of weights of presynaptic neurons
-        Returns:
-            None
-        """
-
-        for i, s in enumerate(self.presyn):
-            s.weight = weight_arr[i]
-
-    @property
-    def scaling_factor(self):
-        return self._S
-
-    @scaling_factor.setter
-    def scaling_factor(self, new_factor):
-        new_factor = int_to_float(new_factor)
-        validate_type(new_factor, float_types)
-        self._S = new_factor
-
     @property
     def threshold(self):
         return self._T
@@ -451,20 +408,6 @@ class InputNeuron(Neuron):
             raise TypeError("{in_stream} must be iterable".format(**locals()))
         else:
             self._it = iter(in_stream)
-
-    def show_iterable(self):
-        """
-        Display the iterable input data stream.
-
-        Returns:
-            None
-        """
-        from itertools import tee
-
-        iter_copy = tee(self._it)
-        iter_list = list(iter_copy)
-        print(f"Input Neuron {self.name} has input stream {iter_list}")
-        print(f"The input stream has {np.count_nonzero(np.array(iter_list))} spikes")
 
     def show_iterable(self):
         """

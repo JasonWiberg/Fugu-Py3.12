@@ -3,11 +3,6 @@
 # Fugu
 A python library for computational neural graphs.
 
-_Note: the `master` branch has been renamed to `main`. We've kept an old version in case it would break any local branches, but on your next git push type the following command to have your origin branch renamed on your local machine:_
-```bash
-git push origin HEAD
-```
-
 # Install
 
 ## Dependencies
@@ -95,7 +90,7 @@ make -j2
 Documentation is currently spread across several files and directories.  We are working on including docstrings on all the classes and methods.
 
 For now, you can check:
-- http://sandialabs.github.io/Fugu/
+- https://sandialabs.github.io/Fugu/
 - This `README.md`
 - The `examples` folder
 
