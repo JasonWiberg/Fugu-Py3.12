@@ -187,6 +187,8 @@ class Vector_Input(InputBrick):
             for spike in range(num_spikes):
                 idx_to_build = deque()
                 for dimension in range(len(local_idxs)):
+                    # issue is the type 
+                    # idx_to_build.append(int(local_idxs[dimension][spike]))
                     idx_to_build.append(int(str(local_idxs[dimension][spike])))
                 global_idxs.append(tuple(idx_to_build))
             spiking_neurons = [
@@ -200,7 +202,7 @@ class Vector_Input(InputBrick):
 
     def set_properties(self, properties={}):
         new_vector = np.array(properties['spike_vector'])
-        if 'time_dimension' not in properties or properties['time_dimension']:
+        if 'time_dimension' not in properties or not properties['time_dimension']:
             new_vector = np.expand_dims(new_vector, len(new_vector.shape))
         if new_vector.shape != self.vector.shape:
             raise ValueError(
@@ -213,6 +215,28 @@ class Vector_Input(InputBrick):
             self.vector = new_vector
             self.current_time = 0
         return None
+
+    # def set_properties(self, properties={}):
+    #     new_vector = np.array(properties['spike_vector'])
+
+    #     # Normalize to what this brick expects, based on how it was created/built
+    #     if self.time_dimension:
+    #         # Expect time on the last axis already; strip a stray singleton if provided
+    #         if new_vector.ndim == self.vector.ndim + 1 and new_vector.shape[-1] == 1:
+    #             new_vector = np.squeeze(new_vector, -1)
+    #     else:
+    #         # Expect no explicit time axis from the user; ensure a trailing time axis of length 1
+    #         if new_vector.ndim == self.vector.ndim - 1:
+    #             new_vector = np.expand_dims(new_vector, -1)
+
+    #     if new_vector.shape != self.vector.shape:
+    #         raise ValueError(
+    #             "Dimensions of new spike vector ({}) does not match expected ({})"
+    #             .format(new_vector.shape, self.vector.shape)
+    #         )
+    #     self.vector = new_vector
+    #     self.current_time = 0
+    #     return None
 
     def get_input_value(self, t=None):
         warn(

@@ -397,6 +397,28 @@ if __name__ == "__main__":
 
     n1 = LIFNeuron("n1")
     n2 = LIFNeuron("n2")
+    s = Synapse(n1, n2, delay=1, weight=1.0)
+
+    try:
+        s.delay(0)
+    except:
+        print("Raised Value error Exception since delay is < 1")
+
+    try:
+        s.delay(2.5)
+    except:
+        print("Raised type error since delay was a float")
+
+    print(f"Synapse parameters: {s.show_params()}")
+    try:
+        s.set_params(new_delay=-1)
+    except:
+        print("Raised Value error Exception since delay is < 1")
+
+    s.set_params(2, 2.0)
+    s.show_params()
+
+    # Learning Synapse
     s = LearningSynapse(n1, n2, delay=1, weight=1.0)
 
     try:

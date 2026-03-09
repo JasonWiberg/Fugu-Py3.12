@@ -15,4 +15,6 @@ from .pooling_bricks import pooling_1d, pooling_2d
 from .dense_bricks import dense_layer_1d, dense_layer_2d
 from .keras_convolution_bricks import keras_convolution_2d_4dinput
 from .mock_bricks import Mock_Brick, Mock_Input
+from .lca_bricks import LCABrick
+from .loihi_gs_brick import LoihiGSBrick
 from .noops_bricks import NoOps
