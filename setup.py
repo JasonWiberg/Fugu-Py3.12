@@ -28,13 +28,14 @@ final_dependencies = filtered_dependencies + [add_dep for add_dep in additional_
 
 setup(
     name="fugu",
-    version="1.4.2",
+    version="1.4.3",
     description="A python library for computational neural graphs",
     install_requires=final_dependencies,
     extras_require={
         "whetstone": ["tensorflow==2.18.0", "keras==3.8.0"],
         "dev": ["pre-commit", "isort", "black", "tqdm", "tox", "tox-conda", "coverage"],
         "examples": ["notebook", "matplotlib", "tqdm"],
+        "snntorch": ["torch", "snntorch"]
     },
     packages=package_list,
     python_requires=">=3.9, <3.12",
