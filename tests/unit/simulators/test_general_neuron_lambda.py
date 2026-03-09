@@ -1,10 +1,6 @@
-import numpy as np
 import pytest
 
 from fugu.simulators.SpikingNeuralNetwork.neuron import GeneralNeuron
-
-# Ensure deterministic random outcomes for probabilistic spiking
-np.random.seed(0)
 
 
 def test_general_neuron_custom_lambda_blocks_spike():
