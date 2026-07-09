@@ -38,5 +38,4 @@ setup(
         "snntorch": ["torch", "snntorch"]
     },
     packages=package_list,
-    python_requires=">=3.9, <3.12",
 )
