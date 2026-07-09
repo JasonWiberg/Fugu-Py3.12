@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 
 from fugu import backends
+from fugu.backends import snn_Backend
 from fugu.bricks.keras_dense_bricks import keras_dense_2d_4dinput as dense_layer_2d
 from fugu.bricks.keras_convolution_bricks import keras_convolution_2d_4dinput as convolution_2d
 from fugu.bricks.input_bricks import BaseP_Input
