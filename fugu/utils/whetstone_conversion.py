@@ -688,17 +688,17 @@ def whetstone_2_fugu(keras_model, basep=4, bits=4, scaffold=None, backend=None):
             #output_shape = tuple([batch_size if value == None else value for value in layer.output_shape])
 
             if isinstance(layer, Softmax_Decode):
-                units = layer._rescaled_key.shape[1]
+                units = layer._rescaled_key.numpy()
+                biases = 0.0
             else:
-                units = layer.units
+                weights = layer.weights[0].numpy()
+                try:
+                    biases = layer.weights[1].numpy()
+                except IndexError:
+                    biases = 0.0
 
             output_shape = (batch_size, units)
 
-            weights = layer.weights[0].numpy()
-            try:
-                biases = layer.weights[1].numpy()
-            except IndexError:
-                biases = 0.0
             units = layer.units
             scaffold.add_brick(keras_dense_2d_4dinput(units=units,weights=weights,thresholds=0.5,name=f"dense_layer_{layerID}",input_shape=input_shape,biases=biases),[(layerID,0)],output=True)
             layerID += 1
