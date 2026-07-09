@@ -440,7 +440,7 @@ class InputNeuron(Neuron):
             if not isinstance(n, numbers.Real):
                 raise TypeError("Inputs must be int or float")
             self.v = n
-            if self.v > 0:
+            if self.v >= self._T:
                 self.spike = True
                 self.v = 0
             else:
