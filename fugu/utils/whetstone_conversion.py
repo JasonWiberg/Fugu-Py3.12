@@ -15,6 +15,8 @@ from fugu.scaffold import Scaffold
 try:
     from tensorflow.keras.layers import Layer, Dense, Lambda, TimeDistributed, GRU, MaxPooling2D, Reshape, Conv2D, Flatten, Dropout, BatchNormalization, Input
     from tensorflow.keras.callbacks import Callback
+    import tensorflow.keras.backend as K
+
 except ModuleNotFoundError:
     print('tensorflow module not found!')
     import pytest
