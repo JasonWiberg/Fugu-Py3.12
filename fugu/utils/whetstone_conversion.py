@@ -2,6 +2,7 @@
 # fmt: off
 import argparse
 import numpy as np
+import os
 
 from fugu import backends
 from fugu.backends import snn_Backend
