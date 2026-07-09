@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import os
 import pickle
-import time
+import json, time
 
 from fugu import backends
 from fugu.backends import snn_Backend
