@@ -13,8 +13,9 @@ from fugu.scaffold import Scaffold
 
 
 try:
-    from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D, BatchNormalization
+    from tensorflow.keras.layers import Layer, Dense, Conv2D, Flatten, MaxPooling2D, BatchNormalization
 except ModuleNotFoundError:
+    print('tensorflow module not found!')
     import pytest
     pytest.skip(reason="Tensorflow package missing.", allow_module_level=True)
 except ImportError:
