@@ -21,17 +21,6 @@ except ImportError:
     raise SystemExit('\n *** Tensorflow package is not installed. *** \n')
 
 
-try:
-    from whetstone.layers import Spiking_BRelu, Softmax_Decode
-    from whetstone.utils.export_utils import copy_remove_batchnorm
-    from whetstone.utils.layer_utils import load_model
-except ImportError as e:
-    import sys
-    if "pytest" in sys.modules:
-        pass
-    else:
-        raise SystemExit('\n *** Whetstone package is not installed. *** \n')
-
 
 def whetstone_2_fugu(keras_model, basep, bits, scaffold=None):
     '''
