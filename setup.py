@@ -6,11 +6,11 @@ package_list = find_packages()
 
 # Get the list of dependencies
 base_dependencies = [
-    "networkx==3.2.1",
+    "networkx",
     "numpy",
-    "pandas~=2.2.3",
+    "pandas",
     "pyyaml",
-    "pytest~=8.3.4",
+    "pytest",
     "scipy",
 ]
 
@@ -32,7 +32,7 @@ setup(
     description="A python library for computational neural graphs",
     install_requires=final_dependencies,
     extras_require={
-        "whetstone": ["tensorflow==2.18.0", "keras==3.8.0"],
+        "whetstone": ["tensorflow", "keras"],
         "dev": ["pre-commit", "isort", "black", "tqdm", "tox", "tox-conda", "coverage"],
         "examples": ["notebook", "matplotlib", "tqdm"],
         "snntorch": ["torch", "snntorch"]
