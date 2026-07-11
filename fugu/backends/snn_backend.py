@@ -115,7 +115,7 @@ class snn_Backend(Backend):
         bool: True if ds format is required and converst neuron names to numbers and returns dictionary, False returns dataframe
 
         """
-        output = self.nn.run(n_steps=n_steps,
+        output = self.simulator.run(n_steps=n_steps,
                              debug_mode=self.debug_mode,
                              record_potentials=return_potentials)
 
